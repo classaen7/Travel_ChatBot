@@ -8,7 +8,7 @@ import time
 from RAG.rag import RAGSystem
 from RAG.video2text import video2text
 from model.models import init_models
-# from openai import OpenAI
+from openai import OpenAI
 
 # def PDF 처리
 
@@ -16,23 +16,18 @@ from model.models import init_models
 NLP_MODEL, EMB_MODEL = init_models()
 RAG = RAGSystem(NLP_MODEL, EMB_MODEL)
 
-# openai_api_key = "EMPTY"
-# openai_api_base = "http://0.0.0.0:8000/v1"
+openai_api_key = "EMPTY"
+openai_api_base = "http://0.0.0.0:8000/v1"
 
 
-# client = OpenAI(
-#     api_key=openai_api_key,
-#     base_url=openai_api_base,
-# )
+client = OpenAI(
+    api_key=openai_api_key,
+    base_url=openai_api_base,
+)
 
-# models = client.models.list()
-# model = models.data[0].id
+models = client.models.list()
+model = models.data[0].id
 
-        # self.sampling_params = SamplingParams(
-        #     temperature=0.7,    # 생성 다양성 조절
-        #     top_p=0.95,        # 누적 확률 기준 토큰 선택
-        #     max_tokens=512     # 최대 생성 토큰 수
-        # )
 
 def pdf_change(pdf_path):
     if pdf_path is not None:
@@ -99,19 +94,20 @@ def run_text_inference(questions, chat_history):
         for question in questions:
             messages.append(question)
 
-        # # Query vLLM with the prepared messages structure
-        # response = client.chat.completions.create(
-        #     model=model,
-        #     messages=messages,
-        #     max_tokens=512,
-        # )
+        # Query vLLM with the prepared messages structure
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=512,
+            temperature=0.3,  # 응답의 다양성 조절
+            top_p=0.8         # 고려할 토큰 후보군의 범위 설정
+        )
 
-        # # Extract the response content for Gradio to display
-        # answer = response.choices[0].message.content
-        # return answer
+        # Extract the response content for Gradio to display
+        answer = response.choices[0].message.content
+        return answer
 
         
-        return str(questions[-1])
     
 def respond(message, image, chat_history,):
 
