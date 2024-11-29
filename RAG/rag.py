@@ -16,11 +16,7 @@ class RAGSystem:
         self.index = None       # FAISS 검색 인덱스
         self.chunks = []        # 텍스트 청크 저장소
         # LLM 생성 파라미터 설정
-        self.sampling_params = SamplingParams(
-            temperature=0.7,    # 생성 다양성 조절
-            top_p=0.95,        # 누적 확률 기준 토큰 선택
-            max_tokens=512     # 최대 생성 토큰 수
-        )
+
 
         self._init_index()
 
@@ -38,6 +34,7 @@ class RAGSystem:
             # # 문장 단위로 분할하고 공백 제거
             # page_chunks = [sent.text.strip() for sent in doc_nlp.sents if sent.text.strip()]
             chunks.extend(page_chunks)
+        
         return chunks
 
     def process_video(self, text: str) -> List[str]:
@@ -51,11 +48,12 @@ class RAGSystem:
         if not chunks:
             return
 
+        self.chunks.extend(chunks)
+
         # 텍스트를 벡터로 변환
         embeddings = self.embedder.encode(chunks)
-        
         self.index.add(embeddings.astype('float32'))
-        self.chunks = chunks
+        
         print(f"인덱스 생성 완료: {len(chunks)}개의 청크")
 
 
