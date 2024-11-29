@@ -3,23 +3,41 @@ import numpy as np
 from PIL import Image
 import base64
 from io import BytesIO
+import time
 
 from RAG.rag import RAGSystem
 from RAG.video2text import video2text
 from model.models import init_models
+# from openai import OpenAI
 
 # def PDF 처리
 
 # Init GLOBAL
 NLP_MODEL, EMB_MODEL = init_models()
 RAG = RAGSystem(NLP_MODEL, EMB_MODEL)
-   
+
+# openai_api_key = "EMPTY"
+# openai_api_base = "http://0.0.0.0:8000/v1"
+
+
+# client = OpenAI(
+#     api_key=openai_api_key,
+#     base_url=openai_api_base,
+# )
+
+# models = client.models.list()
+# model = models.data[0].id
+
+        # self.sampling_params = SamplingParams(
+        #     temperature=0.7,    # 생성 다양성 조절
+        #     top_p=0.95,        # 누적 확률 기준 토큰 선택
+        #     max_tokens=512     # 최대 생성 토큰 수
+        # )
 
 def pdf_change(pdf_path):
     if pdf_path is not None:
         pdf_chunks = RAG.process_pdf(pdf_path)
         RAG.create_index(pdf_chunks)
-    return None
 
 
 def video_change(video_path):
@@ -28,16 +46,58 @@ def video_change(video_path):
         video_chunks = RAG.process_video(video_text)
         RAG.create_index(video_chunks)
         
-    return None
 
+"""
+    역할 지시(Role Instruction)
+    정보제공 지시
+    어조 지시(Tone Instruction)
+    Cot
+"""
 
-def run_text_inference(question, chat_history):
+system_prompt = """
+                당신은 전문 여행 가이드 챗봇입니다.
+                사용자에게 현지 명소, 맛집, 교통 정보 등 유용한 여행 정보를 제공합니다.
+                응답 시 친근하고 이해하기 쉬운 어조를 사용하며 응답의 끝맺음을 명확하게 하세요.
+                복잡한 질문에 대해서는 단계별로 생각해 보고, 각 단계를 설명하며 답변하세요.
+                """
+
+def run_text_inference(questions, chat_history):
+
+        # Vector Search
+        rag_text = ""
+
+        if RAG.index.ntotal > 0:
+            query_embedding = EMB_MODEL.encode([questions[-1]["content"]])
+        
+            k = 5 # 이웃 수
+            distance_threshold = 0.5 # 거리 임계값
+
+            distances, indices = RAG.index.search(query_embedding, k)
+
+            for idx, i in enumerate(indices[0]):
+                if distances[0][idx] < 0.5:
+                    rag_text += RAG.chunks[i]
+
+        if len(rag_text)>0:
+            rag_text = "참고할 맥락 : " + rag_text + "질문 : "
+
+        
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            }]
         
         # Prepare messages from chat history
-        messages = [{"role": msg["role"], "content": msg["content"]} for msg in chat_history]
-
+        messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
+        
+        # messages.extend(history)
+        questions[-1]["content"] = rag_text + questions[-1]["content"]
+        
+    
         # Add the current question as the latest message from the user
-        messages.append({"role": "user", "content": question})
+        for question in questions:
+            messages.append(question)
 
         # # Query vLLM with the prepared messages structure
         # response = client.chat.completions.create(
@@ -46,17 +106,40 @@ def run_text_inference(question, chat_history):
         #     max_tokens=512,
         # )
 
-        # Extract the response content for Gradio to display
+        # # Extract the response content for Gradio to display
         # answer = response.choices[0].message.content
-        return "answer"
-    
-def respond(message, image, chat_history):
+        # return answer
 
-    bot_message = run_text_inference(message, chat_history)
+        
+        return str(questions[-1])
+    
+def respond(message, image, chat_history,):
+
+    def image_encode(image):
+        image_pil = Image.fromarray(image)
+        buffered = BytesIO()
+        image_pil.save(buffered, format="JPEG")
+        return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    
+    questions = []
+
+    if image is not None:
+        image_base64 = image_encode(image)
+        questions.append({"role": "user", "image": {"url": f"data:image/jpeg;base64,{image_base64}"}})
+    
+    questions.append({"role": "user", "content": message})
+    
+    bot_message = run_text_inference(questions, chat_history)
+
+
     chat_history.append({"role": "user", "content": message})
     chat_history.append({"role": "assistant", "content": bot_message})
-    import time
-    time.sleep(2)
+
+
+    print(chat_history)
+    
+    time.sleep(1)
+    
     return "", chat_history
 
 def main():
@@ -97,7 +180,7 @@ def main():
 
 
     # 인터페이스 실행
-    demo.launch()
+    demo.launch(share=True)
 
 
 if __name__ == "__main__":
