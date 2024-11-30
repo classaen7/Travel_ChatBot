@@ -11,6 +11,5 @@ def init_models(spc = "ko_core_news_md", stf = 'all-MiniLM-L6-v2'):
     nlp = semchunk.chunkerify('gpt-4', 64)
     embedder = SentenceTransformer(stf)
 
-    print("모든 모델 초기화 완료!")
     return nlp, embedder
 
