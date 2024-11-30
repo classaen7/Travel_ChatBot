@@ -116,23 +116,28 @@ def respond(message, image, chat_history,):
         buffered = BytesIO()
         image_pil.save(buffered, format="JPEG")
         return base64.b64encode(buffered.getvalue()).decode('utf-8')
-    
-    questions = []
 
     if image is not None:
         image_base64 = image_encode(image)
-        questions.append({"role": "user", "image": {"url": f"data:image/jpeg;base64,{image_base64}"}})
+        question = {"role": "user", "content" : [ {
+            "type" : "image_url",
+            "image_url" : {"url": f"data:image/jpeg;base64,{image_base64}"}  
+        }, 
+        {
+            "type" : "text",
+            "text" : f"질문 : {message}"
+        }]}
     
-    questions.append({"role": "user", "content": message})
+    else:
+        question = {"role": "user", "content": f"질문 : {message}"}
     
-    bot_message = run_text_inference(questions, chat_history)
+    
+    bot_message = run_text_inference(question, chat_history)
 
-
-    chat_history.append({"role": "user", "content": message})
+    chat_history.append(question)
+    # chat_history.append({"role": "user", "content": message})
     chat_history.append({"role": "assistant", "content": bot_message})
 
-
-    print(chat_history)
     
     time.sleep(1)
     
