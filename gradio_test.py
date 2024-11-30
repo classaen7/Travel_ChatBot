@@ -54,15 +54,24 @@ system_prompt = """
                 사용자에게 현지 명소, 맛집, 교통 정보 등 유용한 여행 정보를 제공합니다.
                 응답 시 친근하고 이해하기 쉬운 어조를 사용하며 응답의 끝맺음을 명확하게 하세요.
                 복잡한 질문에 대해서는 단계별로 생각해 보고, 각 단계를 설명하며 답변하세요.
+
+                답변할때 완결한 문장으로 제대로 마무리를 해줘 같은 말은 반복하지 말고
                 """
 
 def run_text_inference(questions, chat_history):
+        
+        if isinstance(questions["content"], list):
+            query = questions["content"][1]["text"]
+        else:
+            query = questions["content"]
+
 
         # Vector Search
         rag_text = ""
 
         if RAG.index.ntotal > 0:
-            query_embedding = EMB_MODEL.encode([questions[-1]["content"]])
+
+            query_embedding = EMB_MODEL.encode([query])
         
             k = 5 # 이웃 수
             distance_threshold = 0.5 # 거리 임계값
@@ -76,7 +85,13 @@ def run_text_inference(questions, chat_history):
         if len(rag_text)>0:
             rag_text = "참고할 맥락 : " + rag_text + "질문 : "
 
-        
+
+        # RAG 메시지 추가
+        if isinstance(questions["content"], list):
+            questions["content"][1]["text"] = rag_text + questions["content"][1]["text"]
+        else:
+            questions["content"] = rag_text + questions["content"]
+
         messages = [
             {
                 "role": "system",
@@ -85,14 +100,9 @@ def run_text_inference(questions, chat_history):
         
         # Prepare messages from chat history
         messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
-        
-        # messages.extend(history)
-        questions[-1]["content"] = rag_text + questions[-1]["content"]
-        
-    
-        # Add the current question as the latest message from the user
-        for question in questions:
-            messages.append(question)
+
+        messages.append(questions)
+
 
         # Query vLLM with the prepared messages structure
         response = client.chat.completions.create(
@@ -103,12 +113,12 @@ def run_text_inference(questions, chat_history):
             top_p=0.8         # 고려할 토큰 후보군의 범위 설정
         )
 
+
         # Extract the response content for Gradio to display
         answer = response.choices[0].message.content
         return answer
 
         
-    
 def respond(message, image, chat_history,):
 
     def image_encode(image):
@@ -119,6 +129,7 @@ def respond(message, image, chat_history,):
 
     if image is not None:
         image_base64 = image_encode(image)
+
         question = {"role": "user", "content" : [ {
             "type" : "image_url",
             "image_url" : {"url": f"data:image/jpeg;base64,{image_base64}"}  
@@ -133,11 +144,9 @@ def respond(message, image, chat_history,):
     
     
     bot_message = run_text_inference(question, chat_history)
-
-    chat_history.append(question)
-    # chat_history.append({"role": "user", "content": message})
+    
+    chat_history.append({"role": "user", "content": message})
     chat_history.append({"role": "assistant", "content": bot_message})
-
     
     time.sleep(1)
     
@@ -175,10 +184,12 @@ def main():
         chatbot = gr.Chatbot(type="messages")
         msg = gr.Textbox()
 
+        clear = gr.ClearButton([msg, chatbot])  
+
 
         msg.submit(respond, [msg, image_input, chatbot], [msg, chatbot])
         
-
+    
 
     # 인터페이스 실행
     demo.launch(share=True)
