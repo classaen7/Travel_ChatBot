@@ -9,8 +9,8 @@ from RAG.rag import RAGSystem
 from RAG.video2text import video2text
 from model.models import init_models
 from openai import OpenAI
+from RAG.summary_history import summary_text
 
-# def PDF 처리
 
 # Init GLOBAL
 NLP_MODEL, EMB_MODEL = init_models()
@@ -42,21 +42,48 @@ def video_change(video_path):
         RAG.create_index(video_chunks)
         
 
-"""
-    역할 지시(Role Instruction)
-    정보제공 지시
-    어조 지시(Tone Instruction)
-    Cot
-"""
 
 system_prompt = """
-                당신은 전문 여행 가이드 챗봇입니다.
-                사용자에게 현지 명소, 맛집, 교통 정보 등 유용한 여행 정보를 제공합니다.
-                응답 시 친근하고 이해하기 쉬운 어조를 사용하며 응답의 끝맺음을 명확하게 하세요.
-                복잡한 질문에 대해서는 단계별로 생각해 보고, 각 단계를 설명하며 답변하세요.
+당신은 전문 여행 가이드 챗봇입니다.
+사용자에게 현지 명소, 맛집, 교통 정보, 숙박 정보 등 여행과 관련된 모든 정보를 제공합니다.
+친근하고 이해하기 쉬운 어조를 사용하며, 명확한 문장으로 답변을 마무리합니다.
+질문이 복잡할 경우, 단계별로 문제를 분석하고 각 단계를 설명하며 답변을 제공합니다.
+사용자가 요청하지 않더라도 추가로 유용할 수 있는 정보를 적절히 제안합니다.
+사용자가 요청한 정보가 간단할 경우, 바로 답변을 제공합니다.
 
-                답변할때 완결한 문장으로 제대로 마무리를 해줘 같은 말은 반복하지 말고
-                """
+예시:
+- 사용자 질문: "이탈리아에서 유명한 관광지는?"
+- 답변: "이탈리아에서 가장 유명한 관광지로는 로마의 콜로세움, 피렌체의 두오모 성당, 베네치아의 대운하 등이 있습니다. 특히, 콜로세움은 로마 제국의 역사를 느낄 수 있는 대표적인 장소입니다. 추가로 알고 싶은 도시가 있나요?"
+
+위의 지침을 엄격히 따르며, 같은 말을 반복하지 마세요.
+"""
+
+# system_prompt = """
+# 당신은 전문 여행 가이드 챗봇입니다.
+# 다음의 지침을 따라 사용자에게 최적의 답변을 제공합니다:
+
+# 1. **역할**: 사용자에게 현지 명소, 맛집, 교통 정보, 숙박 정보 등 여행과 관련된 모든 정보를 제공합니다.
+# 2. **어조**: 친근하고 이해하기 쉬운 어조를 사용하며, 명확한 문장으로 답변을 마무리합니다.
+# 3. **행동 방식**:
+#     - 질문이 복잡할 경우, 단계별로 문제를 분석하고 각 단계를 설명하며 답변을 제공합니다.
+#     - 사용자가 요청하지 않더라도 추가로 유용할 수 있는 정보를 적절히 제안합니다.
+# 4. **응답 형식**:
+#     - 사용자가 요청한 정보가 간단할 경우, 바로 답변을 제공합니다.
+#     - 배경 정보가 필요할 경우, 맥락을 설명한 후에 답변을 제공합니다.
+
+# 예시:
+# - 사용자 질문: "이탈리아에서 유명한 관광지는?"
+# - 답변: "이탈리아에서 가장 유명한 관광지로는 로마의 콜로세움, 피렌체의 두오모 성당, 베네치아의 대운하 등이 있습니다. 특히, 콜로세움은 로마 제국의 역사를 느낄 수 있는 대표적인 장소입니다. 추가로 알고 싶은 도시가 있나요?"
+
+# 위 지침을 엄격히 따르며, 사용자의 요구를 충족시키세요.
+# """
+
+
+
+
+
+
+
 
 def run_text_inference(questions, chat_history):
         
@@ -77,13 +104,17 @@ def run_text_inference(questions, chat_history):
             distance_threshold = 0.5 # 거리 임계값
 
             distances, indices = RAG.index.search(query_embedding, k)
+            
 
             for idx, i in enumerate(indices[0]):
-                if distances[0][idx] < 0.5:
+                if distances[0][idx] < 0.85:
                     rag_text += RAG.chunks[i]
 
         if len(rag_text)>0:
-            rag_text = "참고할 맥락 : " + rag_text + "질문 : "
+            print(rag_text)
+            rag_text = "참고할 맥락 : " + rag_text
+        else:
+            print("---------------No RAG---------------")
 
 
         # RAG 메시지 추가
@@ -92,26 +123,49 @@ def run_text_inference(questions, chat_history):
         else:
             questions["content"] = rag_text + questions["content"]
 
+
         messages = [
             {
                 "role": "system",
                 "content": system_prompt
             }]
-        
-        # Prepare messages from chat history
         messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
-
         messages.append(questions)
 
+        
+        try:
+            # Query vLLM with the prepared messages structure
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=512,
+                temperature=0.1,  # 응답의 다양성 조절
+                top_p=0.9         # 고려할 토큰 후보군의 범위 설정
+            )
+            
+            
+        except: # 텍스트 요약 처리
+            messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            }]
+            a,u = summary_text(chat_history)
 
-        # Query vLLM with the prepared messages structure
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=512,
-            temperature=0.3,  # 응답의 다양성 조절
-            top_p=0.8         # 고려할 토큰 후보군의 범위 설정
-        )
+
+            messages.append({"role":"user", "content" : u})
+            messages.append({"role":"assistant", "content" : a})
+
+            messages.append(questions)
+
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=512,
+                temperature=0.1,  # 응답의 다양성 조절
+                top_p=0.9         # 고려할 토큰 후보군의 범위 설정
+            )
+
 
 
         # Extract the response content for Gradio to display
