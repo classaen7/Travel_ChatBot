@@ -105,14 +105,14 @@ def run_text_inference(questions, chat_history):
 
             distances, indices = RAG.index.search(query_embedding, k)
             
-
+            
             for idx, i in enumerate(indices[0]):
+
                 if distances[0][idx] < 0.85:
                     rag_text += RAG.chunks[i]
 
         if len(rag_text)>0:
-            print(rag_text)
-            rag_text = "참고할 맥락 : " + rag_text
+            rag_text = "참고할 맥락 : " + rag_text + "질문"
         else:
             print("---------------No RAG---------------")
 
@@ -190,11 +190,11 @@ def respond(message, image, chat_history,):
         }, 
         {
             "type" : "text",
-            "text" : f"질문 : {message}"
+            "text" : message
         }]}
     
     else:
-        question = {"role": "user", "content": f"질문 : {message}"}
+        question = {"role": "user", "content": message}
     
     
     bot_message = run_text_inference(question, chat_history)
