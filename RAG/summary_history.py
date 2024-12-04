@@ -33,7 +33,5 @@ def summary_text(hist):
         sent.text for sent in u_doc._.textrank.summary(limit_phrases=15, limit_sentences=3)
     ]
 
-    print(a_result)
-    print(u_result)
 
     return ' '.join(a_result), ' '.join(u_result)
