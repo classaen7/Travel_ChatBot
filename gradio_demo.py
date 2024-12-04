@@ -112,6 +112,7 @@ def run_text_inference(questions, chat_history):
                     rag_text += RAG.chunks[i]
 
         if len(rag_text)>0:
+            print(rag_text)
             rag_text = "참고할 맥락 : " + rag_text + "질문"
         else:
             print("---------------No RAG---------------")
