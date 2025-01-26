@@ -6,9 +6,11 @@ import csv
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+import urllib.request
+from tqdm import tqdm
 
 
-# CSV 파일에서 문화재 데이터 읽기
+# CSV 
 data_file = "korean_landmarks.csv"
 data = []
 
@@ -19,61 +21,57 @@ with open(data_file, "r", encoding="utf-8") as file:
         data.append(row)
 
 
-# 이미지 저장 디렉토리 생성
+# 이미지 저장 디렉토리 
 output_dir = "images"
 os.makedirs(output_dir, exist_ok=True)
 
-# Selenium을 이용한 이미지 크롤링
+
+# 크롤링 함수
 def download_images():
-    # ChromeDriver 절대 경로 설정
+
     chromeDriverPath = '/home/sion/chromedriver-linux64/chromedriver'
 
-    # 옵션 설정
     chrome_options = Options()
     chrome_options.add_argument('--no-sandbox')  # 필요한 경우 추가
 
-    # ChromeDriver 초기화
     service = Service(chromeDriverPath)
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
-    for landmark in data:
-        name, location, description = landmark
-        search_query = f"{name} {location}"
+    for landmark in tqdm(data, desc="Processing Landmarks", unit="landmark"):
+        name, _, _ = landmark
+
+        print(f"{name} 이미지 크롤링 ...")
+
+        search_query = f"{name} 이미지"
         
         # Google 이미지 검색
         driver.get(f"https://www.google.com/search?q={search_query}&tbm=isch")
         time.sleep(2)  # 페이지 로드 대기
 
 
-        images = driver.find_elements(By.CSS_SELECTOR, ".F0uyec")
-        links = [image.get_attribute('src') for image in images if image.get_attribute('src') is not None]
-        print('찾은 이미지의 개수 : ', len(links))
+        img_element = driver.find_elements(By.CSS_SELECTOR, ".F0uyec")
+        time.sleep(3)
 
+        cnt = 0
+    
+        for img in img_element:
+            if cnt >= 10:
+                break
 
-#         # 이미지 요소 수집
-#         images = driver.find_elements(By.CSS_SELECTOR, "img")
-#         count = 0
+            try:
+                img.click()
+                driver.implicitly_wait(5)
 
-#         for img in images:
-#             if count >= 10:
-#                 break
+                img_ele = driver.find_element(By.XPATH, '//*[@id="Sva75c"]/div[2]/div[2]/div/div[2]/c-wiz/div/div[3]/div[1]/a/img[1]')
 
-#             try:
-#                 src = img.get_attribute("src")
-#                 if src and src.startswith("http"):
-#                     # 이미지 저장
-#                     file_name = f"{name}_{count + 1}.jpg"
-#                     file_path = os.path.join(output_dir, file_name)
-                    
-#                     with open(file_path, "wb") as file:
-#                         file.write(driver.execute_script("return fetch(arguments[0]).then(res => res.arrayBuffer()).then(buff => new Uint8Array(buff));", src))
+                img_url = img_ele.get_attribute('src')
 
-#                     print(f"Saved {file_name}")
-#                     count += 1
-#             except Exception as e:
-#                 print(f"Error downloading image for {name}: {e}")
+                urllib.request.urlretrieve(img_url, f"./images/{name}_{cnt+1}.jpg")
+                cnt += 1
+                
+            except:
+                pass
 
-#     driver.quit()
 
 # 크롤링 실행
 download_images()
