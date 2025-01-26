@@ -2,6 +2,8 @@ from moviepy import VideoFileClip
 from pydub import AudioSegment
 import speech_recognition as sr
 
+
+
 def extract_audio_from_video(video_path, audio_output_path):
     video = VideoFileClip(video_path)
     video.audio.write_audiofile(audio_output_path)

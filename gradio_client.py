@@ -67,7 +67,6 @@ def run_text_inference(questions, chat_history):
             query = questions["content"]
 
 
-        # Vector Search
         rag_text = ""
 
         if RAG.index.ntotal > 0:
@@ -86,10 +85,7 @@ def run_text_inference(questions, chat_history):
                     rag_text += RAG.chunks[i]
 
         if len(rag_text)>0:
-            print(rag_text)
             rag_text = "참고할 맥락 : " + rag_text + "질문"
-        else:
-            print("---------------No RAG---------------")
 
 
         # RAG 메시지 추가
@@ -109,7 +105,6 @@ def run_text_inference(questions, chat_history):
 
         
         try:
-            # Query vLLM with the prepared messages structure
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -141,9 +136,6 @@ def run_text_inference(questions, chat_history):
                 top_p=0.9         # 고려할 토큰 후보군의 범위 설정
             )
 
-
-
-        # Extract the response content for Gradio to display
         answer = response.choices[0].message.content
         return answer
 
