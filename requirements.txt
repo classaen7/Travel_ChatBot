@@ -1,0 +1,12 @@
+gradio
+faiss-cpu
+pymupdf
+moviepy
+pydub
+SpeechRecognition
+sentence-transformers
+semchunk
+pillow
+vllm
+spacy
+pytextrank
